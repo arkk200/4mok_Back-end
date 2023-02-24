@@ -1,13 +1,12 @@
-type onlinePlayerInfo = {
-    id: string,
+type PlayerInfo = {
     nickname: string,
     imgBase64: string
 };
 
-type onlinePlayerInfoWithId = {
+type PlayerInfoWithId = {
     id: string,
     nickname: string,
     imgBase64: string
 }
 
-export { onlinePlayerInfo, onlinePlayerInfoWithId };
+export { PlayerInfo, PlayerInfoWithId };
