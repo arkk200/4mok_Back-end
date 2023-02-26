@@ -9,4 +9,10 @@ type PlayerInfoWithId = {
     imgBase64: string
 }
 
-export { PlayerInfo, PlayerInfoWithId };
+type gameOverData = {
+    isWin?: boolean,
+    oppResigned?: boolean,
+    isDraw?: boolean
+}
+
+export { PlayerInfo, PlayerInfoWithId, gameOverData };

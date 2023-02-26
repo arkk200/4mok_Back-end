@@ -1,5 +1,5 @@
 import { Socket } from "socket.io";
-import { PlayerInfo, PlayerInfoWithId } from "./types";
+import { gameOverData, PlayerInfo, PlayerInfoWithId } from "./types";
 
 const http = require("http");
 const SocketIO = require('socket.io');
@@ -15,30 +15,47 @@ let hostPlayersInfo: { [code: string]: PlayerInfoWithId } = {};
 
 
 io.on('connection', (socket: Socket) => {
+    console.log(`${socket.id} connected`);
 
     function getSocketFromId(id: string) {
         return io.sockets.sockets.get(id);
     }
-    
+
+    function emitGameOver(player1Id: string, player2Id: string, player1Data: gameOverData, player2Data: gameOverData, roomId: string) {
+        const player1 = getSocketFromId(player1Id);
+        const player2 = getSocketFromId(player2Id);
+        player1?.emit('gameOver', player1Data);
+        player2?.emit('gameOver', player2Data);
+        player1?.leave(roomId);
+        player2?.leave(roomId);
+    }
+
     function playerFound(p1Info: PlayerInfoWithId, p2Info: PlayerInfoWithId, callback: () => void) {
         const roomId = `${p1Info.id}${p2Info.id}`;
         const player1 = getSocketFromId(p1Info.id);
         const player2 = getSocketFromId(p2Info.id);
         player1.join(roomId);
         player2.join(roomId);
-    
+
         callback();
-    
+
         const firstOrder = Math.floor(Math.random() * 2) > 1 ? player1.id : player2.id;
-    
+
         io.to(roomId).emit('found', {
             roomId,
             firstOrder,
             playersInfo: [p1Info, p2Info],
         });
+
+        socket.on('disconnect', () => {
+            if (socket.id === player1.id) {
+                emitGameOver(player1.id, player2.id, { isWin: false }, { oppResigned: true }, roomId);
+            } else {
+                emitGameOver(player1.id, player2.id, { oppResigned: true }, { isWin: false }, roomId);
+            }
+        })
     }
 
-    console.log(`${socket.id} connected`);
 
     // 온라인으로 게임 참가할 때 주고받는 소켓
     function onlineCancel() {
@@ -55,6 +72,7 @@ io.on('connection', (socket: Socket) => {
         });
 
         if (onlinePlayersInfo.length >= 2) {
+            console.log("Founded");
             playerFound(
                 onlinePlayersInfo[0],
                 onlinePlayersInfo[1],
@@ -68,11 +86,10 @@ io.on('connection', (socket: Socket) => {
 
     // 호스트로 게임 참가할 때 주고받는 소켓
     function hostCancel(code: string) {
-        console.log("hostCancel");
         delete hostPlayersInfo[code];
     }
 
-    socket.on('host', (info: PlayerInfo) => {        
+    socket.on('host', (info: PlayerInfo) => {
         let code = `${Math.floor(Math.random() * 10000)}`.padStart(4, '0');
         while (hostPlayersInfo.hasOwnProperty(code)) {
             code = `${Math.floor(Math.random() * 10000)}`.padStart(4, '0');
@@ -85,7 +102,7 @@ io.on('connection', (socket: Socket) => {
         socket.on('disconnect', () => hostCancel(code));
         socket.emit('code', code);
     });
-    socket.on('hostCancel', ({code}) => hostCancel(code));
+    socket.on('hostCancel', ({ code }) => hostCancel(code));
 
     socket.on('join', ({ playerInfo: info, code }) => {
         if (hostPlayersInfo.hasOwnProperty(code)) {
@@ -100,33 +117,78 @@ io.on('connection', (socket: Socket) => {
     })
 
     // 게임 중
-    socket.on('setMok', ({ x, y, roomId }) => {
-        io.to(roomId).emit("setMok", { x, y });
+    socket.on('setMok', ({ y, roomId }) => {
+        io.to(roomId).emit("setMok", { y });
     });
-    socket.on('placeMok', ({ x, y, order, playersId, roomId }) => {
-        order = playersId.filter((id: string) => id !== order)[0];
-        io.to(roomId).emit("placeMok", { x, y, order });
+
+    async function checkIsWin(x: number, y: number, board: string[][]) {
+        let c = x, r = y, cnt: number = 0;
+
+
+        // 세로 방향
+        // if (c < 3) return false;
+        while (c >= 0 && board[r][c--] === socket.id)
+            if (++cnt === 4) {
+                return true;
+            }
+        cnt = 0;
+        c = x;
+
+        // 가로 방향
+        while (r > 0 && board[--r][c] === socket.id);
+
+        // if (r > 3) return false;
+        while (r <= 6 && board[r++][c] === socket.id)
+            if (++cnt === 4) {
+                return true;
+            }
+        cnt = 0;
+        r = y;
+
+        // 대각선 방향
+        // 좌하단에서 우상단
+        while (c > 0 && r > 0 && board[--r][--c] == socket.id);
+
+        while (c <= 5 && r <= 6 && board[r++][c++] == socket.id)
+            if (++cnt === 4) {
+                return true;
+            }
+        cnt = 0;
+        c = x; r = y;
+
+        // 우하단에서 좌상단
+        while (c > 0 && r < 6 && board[++r][--c] == socket.id);
+
+        while (c <= 5 && r >= 0 && board[r--][c++] == socket.id)
+            if (++cnt === 4) {
+                return true;
+            }
+
+        return false;
+    }
+
+    let cnt = 0;
+
+    socket.on('placeMok', async ({ y, order, playersId, roomId, board }) => {
+        board[y].push(order);
+        const isWin: boolean = await checkIsWin(board[y].length - 1, y, board);
+        const nextOrder = playersId.filter((id: string) => id !== order)[0];
+        io.to(roomId).emit("placeMok", { order: nextOrder, board });
+        if (isWin) {
+            setTimeout(() => {
+                emitGameOver(order, playersId.filter((id: string) => id !== order)[0], { isWin: true }, { isWin: false }, roomId);
+            }, (6 - board[y].length) * 100);
+        } else if (board.every((column: string[]) => column.length == 6)) {
+            emitGameOver(order, playersId.filter((id: string) => id !== order)[0], { isDraw: true }, { isDraw: true }, roomId);
+        }
     });
     socket.on('resign', ({ playerId, playersId, roomId }) => {
-        console.log('Someone resigned', playersId);
-        const loser = getSocketFromId(playerId);
-        const winner = getSocketFromId(playersId.filter((id: string) => id !== playerId)[0]);
-        loser.emit('gameOver', { isWin: false });
-        winner.emit('gameOver', { oppResigned: true });
-        loser.leave(roomId);
-        winner.leave(roomId);
+        emitGameOver(playerId, playersId.filter((id: string) => id !== playerId)[0], { isWin: false }, { oppResigned: true }, roomId);
     });
     socket.on('timeOut', ({ playerId, playersId, roomId }) => {
-        console.log('time out', playersId);
-        const loser = getSocketFromId(playerId);
-        const winner = getSocketFromId(playersId.filter((id: string) => id !== playerId)[0]);
-        loser.emit('gameOver', { isWin: false });
-        winner.emit('gameOver', { isWin: true });
-        loser.leave(roomId);
-        winner.leave(roomId);
+        emitGameOver(playerId, playersId.filter((id: string) => id !== playerId)[0], { isWin: false }, { isWin: true }, roomId);
     });
 });
 
 server.listen(8080, () => {
-    console.log(`Listening on http://localhost:8080`);
 });
