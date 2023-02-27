@@ -190,5 +190,5 @@ io.on('connection', (socket: Socket) => {
     });
 });
 
-server.listen(8080, () => {
+server.listen(8080, '172.30.1.30', () => {
 });
