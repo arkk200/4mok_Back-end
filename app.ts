@@ -47,12 +47,13 @@ io.on('connection', (socket: Socket) => {
             playersInfo: [p1Info, p2Info],
         });
 
-        socket.on('disconnect', () => {
+        socket.once('disconnect', () => {
             if (socket.id === player1.id) {
                 emitGameOver(player1.id, player2.id, { isWin: false }, { oppResigned: true }, roomId);
             } else {
                 emitGameOver(player1.id, player2.id, { oppResigned: true }, { isWin: false }, roomId);
             }
+            socket.removeAllListeners('disconnect');
         })
     }
 
@@ -60,10 +61,11 @@ io.on('connection', (socket: Socket) => {
     // 온라인으로 게임 참가할 때 주고받는 소켓
     function onlineCancel() {
         onlinePlayersInfo = onlinePlayersInfo.filter(info => info.id !== socket.id);
+        socket.removeAllListeners('disconnect');
     }
 
     socket.on('online', (info: PlayerInfo) => {
-        socket.on('disconnect', onlineCancel);
+        socket.once('disconnect', onlineCancel);
 
         onlinePlayersInfo.push({
             id: socket.id,
@@ -87,6 +89,7 @@ io.on('connection', (socket: Socket) => {
     // 호스트로 게임 참가할 때 주고받는 소켓
     function hostCancel(code: string) {
         delete hostPlayersInfo[code];
+        socket.removeAllListeners('disconnect');
     }
 
     socket.on('host', (info: PlayerInfo) => {
