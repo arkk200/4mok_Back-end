@@ -70,7 +70,7 @@ io.on('connection', (socket: Socket) => {
         onlinePlayersInfo.push({
             id: socket.id,
             nickname: info.nickname,
-            imgBase64: info.imgBase64
+            image: info.image
         });
 
         if (onlinePlayersInfo.length >= 2) {
@@ -100,7 +100,7 @@ io.on('connection', (socket: Socket) => {
         hostPlayersInfo[code] = ({
             id: socket.id,
             nickname: info.nickname,
-            imgBase64: info.imgBase64
+            image: info.image
         });
         socket.on('disconnect', () => hostCancel(code));
         socket.emit('code', code);

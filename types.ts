@@ -1,12 +1,12 @@
 type PlayerInfo = {
     nickname: string,
-    imgBase64: string
+    image: string
 };
 
 type PlayerInfoWithId = {
     id: string,
     nickname: string,
-    imgBase64: string
+    image: string
 }
 
 type gameOverData = {
