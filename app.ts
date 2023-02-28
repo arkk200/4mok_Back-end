@@ -129,7 +129,6 @@ io.on('connection', (socket: Socket) => {
 
 
         // 세로 방향
-        // if (c < 3) return false;
         while (c >= 0 && board[r][c--] === socket.id)
             if (++cnt === 4) {
                 return true;
@@ -138,9 +137,8 @@ io.on('connection', (socket: Socket) => {
         c = x;
 
         // 가로 방향
-        while (r > 0 && board[--r][c] === socket.id);
+        while (r > 0 && board[r-1][c] === socket.id) r--;
 
-        // if (r > 3) return false;
         while (r <= 6 && board[r++][c] === socket.id)
             if (++cnt === 4) {
                 return true;
@@ -150,7 +148,7 @@ io.on('connection', (socket: Socket) => {
 
         // 대각선 방향
         // 좌하단에서 우상단
-        while (c > 0 && r > 0 && board[--r][--c] == socket.id);
+        while (c > 0 && r > 0 && board[r-1][c-1] == socket.id) { r--; c--; };
 
         while (c <= 5 && r <= 6 && board[r++][c++] == socket.id)
             if (++cnt === 4) {
@@ -160,7 +158,7 @@ io.on('connection', (socket: Socket) => {
         c = x; r = y;
 
         // 우하단에서 좌상단
-        while (c > 0 && r < 6 && board[++r][--c] == socket.id);
+        while (c > 0 && r < 6 && board[r+1][c-1] == socket.id) { r++; c--; };
 
         while (c <= 5 && r >= 0 && board[r--][c++] == socket.id)
             if (++cnt === 4) {
